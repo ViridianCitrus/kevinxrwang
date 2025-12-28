@@ -1,2 +1,2 @@
-# websitev2
-A personal website to display my portfolio
+# kevinxrwang.ca
+A personal website to display my portfolio built using React and Typescript
