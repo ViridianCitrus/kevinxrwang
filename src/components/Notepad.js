@@ -179,7 +179,7 @@ function Notepad() {
           id: 0,
           title: "Kevin Wang",
           filename: "kevinwang.txt",
-          text: "",
+          text: homeContent,
         };
         setActiveId(0);
         nextTabId.current = Math.max(nextTabId.current, 1);
@@ -196,14 +196,18 @@ function Notepad() {
 
   const selectTab = (id) => setActiveId(id);
 
+  const BASE = "/kevinxrwang";
   const getRouteFromFilename = (filename) => {
-    if (!filename) return "/";
+    if (!filename) return BASE;
     const lower = filename.toLowerCase();
-    if (lower === "projects.txt" || lower === "projects") return "/projects";
-    if (lower === "resume.txt" || lower === "resume") return "/resume";
-    if (lower === "kevinwang.txt" || lower === "kevinwang") return "/";
+    if (lower === "projects.txt" || lower === "projects")
+      return `${BASE}/projects`;
+    if (lower === "resume.txt" || lower === "resume") return `${BASE}/resume`;
+    if (lower === "kevinwang.txt" || lower === "kevinwang") return BASE;
     // fallback: map filename to a file route
-    return `/file/${encodeURIComponent(filename.replace(/\.[^/.]+$/, ""))}`;
+    return `${BASE}/file/${encodeURIComponent(
+      filename.replace(/\.[^/.]+$/, "")
+    )}`;
   };
 
   // keep URL in sync with the active tab
@@ -308,7 +312,7 @@ function Notepad() {
         <div className="menu-group">
           <button
             className={`menu-label ${isHomeActive ? "menu-active" : ""}`}
-            onClick={() => openOrActivateTab("kevinwang.txt", "/")}
+            onClick={() => openOrActivateTab("kevinwang.txt", "/kevinxrwang")}
           >
             Home
           </button>
@@ -316,7 +320,9 @@ function Notepad() {
         <div className="menu-group">
           <button
             className={`menu-label ${isProjectsActive ? "menu-active" : ""}`}
-            onClick={() => openOrActivateTab("Projects.txt", "/projects")}
+            onClick={() =>
+              openOrActivateTab("Projects.txt", "/kevinxrwang/projects")
+            }
           >
             Projects
           </button>
@@ -324,7 +330,9 @@ function Notepad() {
         <div className="menu-group">
           <button
             className={`menu-label ${isResumeActive ? "menu-active" : ""}`}
-            onClick={() => openOrActivateTab("Resume.txt", "/resume")}
+            onClick={() =>
+              openOrActivateTab("Resume.txt", "/kevinxrwang/resume")
+            }
           >
             Resume
           </button>
