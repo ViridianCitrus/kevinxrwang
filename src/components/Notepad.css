@@ -57,7 +57,7 @@
 }
 .notepad-tab:hover { background: rgba(0,0,0,0.03); color: #0b1220; }
 .notepad-tab.tab-active {
-  background: var(--bg); /* use window background so tab connects to content */
+  background: var(--menu-bg); /* match menu bar color */
   color: #0b1220;
   box-shadow: none;
   margin-bottom: 0;
@@ -71,7 +71,6 @@
 .tab-title { max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tab-close { background: transparent; border: none; color: inherit; font-size: 14px; width: 20px; height: 20px; border-radius: 6px; cursor: pointer; }
 .tab-close:hover { background: rgba(0,0,0,0.05); }
-.tab-add { margin-left: 6px; background: transparent; border: none; color: var(--muted); font-size: 18px; width: 36px; height: 32px; border-radius: 8px; cursor: pointer; }
 .notepad-root.dark .tab-add, .notepad-root.dark .notepad-tab { color: var(--muted); }
 
 .menu-group { position: relative; }
@@ -85,6 +84,10 @@
   border-radius: 6px;
 }
 .menu-label:hover { background: rgba(0,0,0,0.03); color: #111827; }
+
+/* active menu button matches active tab/menu background */
+.menu-label.menu-active { background: var(--menu-bg); color: #0b1220; }
+.notepad-root.dark .menu-label.menu-active { background: var(--menu-bg); color: #F1F1F1; }
 
 .menu-group .menu-dropdown {
   position: absolute;
@@ -136,6 +139,15 @@
 .notepad-root.dark .theme-toggle { color: var(--muted); }
 
 .notepad-text {
+  /* scrolling */
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  /* preserve formatting */
+  white-space: pre-wrap;
+
+  /* allow flexbox to constrain height */
+  min-height: 0;
   flex: 1;
   padding: 18px 20px;
   border: none;
@@ -179,7 +191,7 @@
   --panel-border: #3E3E40; /* divider/border tone */
   --muted: #9aa4b2; /* subdued text */
   --accent: #2b8cff;
-  --menu-bg: var(--bg);
+  --menu-bg: #2D2C2D; /* menu and active tab colour per request */
 }
 
 /* Dark mode: flat, Windows-11-like palette */
@@ -192,7 +204,7 @@
 }
 
 .notepad-root.dark .notepad-menu {
-  background: transparent;
+  background: var(--menu-bg);
 }
 
 .notepad-root.dark .menu-label {
@@ -219,3 +231,19 @@
 
 /* Utility: apply dark class when needed */
 .notepad-root.dark { --muted: #9aa4b2; }
+
+/* Light mode: active tab is white */
+.notepad-root:not(.dark) .notepad-tab.tab-active {
+  background: #FFFFFF;
+  color: #0b1220;
+}
+
+.notepad-content a {
+  color: inherit;          /* use normal text color */
+  text-decoration: none;  /* remove underline */
+  cursor: pointer;
+}
+
+.notepad-content a:hover {
+  text-decoration: underline; /* subtle hint on hover */
+}

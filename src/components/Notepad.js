@@ -1,9 +1,26 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import "./Notepad.css";
+import TypingNotepad from "./TypingNotepad";
+import homeContent from "../pages/home";
+import projectsContent from "../pages/projects";
+import resumeContent from "../pages/resume";
+
+const getTitleFromFilename = (fname) => {
+  if (!fname) return "";
+  const base = fname.replace(/\.[^/.]+$/, "");
+  const key = base.toLowerCase();
+  if (key.includes("kevinwang")) return "Kevin Wang";
+  if (key.includes("projects")) return "Projects";
+  if (key.includes("resume")) return "Resume";
+  return base
+    .replace(/[-_]/g, " ")
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+};
 
 function Notepad() {
-  const [text, setText] = useState("");
-  const [filename, setFilename] = useState("Untitled.txt");
+  const [filename, setFilename] = useState("kevinwang.txt");
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
   const [status, setStatus] = useState("Ln 1, Col 1");
@@ -12,38 +29,6 @@ function Notepad() {
       ? localStorage.getItem("notepad-theme") || "light"
       : "light"
   );
-
-  useEffect(() => {
-    const updateStatus = () => {
-      const el = textareaRef.current;
-      if (!el) return;
-      const value = el.value;
-      const start = el.selectionStart;
-      const lines = value.slice(0, start).split("\n");
-      const ln = lines.length;
-      const col = lines[lines.length - 1].length + 1;
-      const words = value.trim() ? value.trim().split(/\s+/).length : 0;
-      setStatus(`Ln ${ln}, Col ${col} — ${words} words`);
-    };
-    updateStatus();
-  }, [text]);
-
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.ctrlKey && (e.key === "s" || e.key === "S")) {
-        e.preventDefault();
-        handleSave();
-      } else if (e.ctrlKey && (e.key === "o" || e.key === "O")) {
-        e.preventDefault();
-        fileInputRef.current?.click();
-      } else if (e.ctrlKey && (e.key === "n" || e.key === "N")) {
-        e.preventDefault();
-        handleNew();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [text]);
 
   useEffect(() => {
     try {
@@ -61,19 +46,130 @@ function Notepad() {
   // Tabs state: each tab { id, title, filename, text }
   const nextTabId = useRef(1);
   const [tabs, setTabs] = useState(() => [
-    { id: 0, title: "Untitled", filename: "Untitled.txt", text: "" },
+    {
+      id: 0,
+      title: "Kevin Wang",
+      filename: "kevinwang.txt",
+      text: homeContent,
+    },
   ]);
   const [activeId, setActiveId] = useState(0);
 
-  const createTab = (content = "", fname = "Untitled.txt") => {
-    const id = nextTabId.current++;
-    const title = fname.replace(/\.\w+$/, "") || `Untitled${id}`;
-    const tab = { id, title, filename: fname, text: content };
-    setTabs((t) => [...t, tab]);
-    setActiveId(id);
-    return id;
-  };
+  // refs to hold latest tabs/activeId for global handlers to avoid stale closures
+  const activeIdRef = useRef(activeId);
+  const tabsRef = useRef(tabs);
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
+  useEffect(() => {
+    tabsRef.current = tabs;
+  }, [tabs]);
 
+  // update status (Ln/Col/words) based on textarea events and selection
+  useEffect(() => {
+    const updateStatus = () => {
+      const el = textareaRef.current;
+      if (!el) return;
+      const value = el.value || "";
+      const start = el.selectionStart ?? 0;
+      const lines = value.slice(0, start).split("\n");
+      const ln = lines.length;
+      const col = lines[lines.length - 1].length + 1;
+      const words = value.trim() ? value.trim().split(/\s+/).length : 0;
+      setStatus(`Ln ${ln}, Col ${col} — ${words} words`);
+    };
+
+    const el = textareaRef.current;
+    updateStatus();
+    if (el) {
+      el.addEventListener("input", updateStatus);
+      el.addEventListener("click", updateStatus);
+      el.addEventListener("keyup", updateStatus);
+      el.addEventListener("mouseup", updateStatus);
+    }
+    return () => {
+      if (el) {
+        el.removeEventListener("input", updateStatus);
+        el.removeEventListener("click", updateStatus);
+        el.removeEventListener("keyup", updateStatus);
+        el.removeEventListener("mouseup", updateStatus);
+      }
+    };
+  }, [activeId]);
+
+  // keep displayed filename in sync when active tab changes
+  useEffect(() => {
+    const active = tabs.find((t) => t.id === activeId) || tabs[0];
+    if (!active) return;
+    setFilename(active.filename || active.title || "");
+    // trigger status update
+    const el = textareaRef.current;
+    if (el) {
+      const event = new Event("input", { bubbles: true });
+      el.dispatchEvent(event);
+    }
+  }, [activeId, tabs]);
+
+  const createTab = useCallback(
+    (content = "", fname = "kevinwang.txt") => {
+      const normalized = (fname || "").trim().toLowerCase();
+      let existingId = null;
+      setTabs((prev) => {
+        const found = prev.find(
+          (t) => (t.filename || "").toLowerCase() === normalized
+        );
+        if (found) {
+          existingId = found.id;
+          return prev;
+        }
+        const id = nextTabId.current++;
+        const title = getTitleFromFilename(fname) || `Untitled${id}`;
+        const tab = { id, title, filename: fname, text: content };
+        return [...prev, tab];
+      });
+
+      if (existingId !== null) {
+        setActiveId(existingId);
+        return existingId;
+      }
+
+      const newId = nextTabId.current - 1;
+      setActiveId(newId);
+      return newId;
+    },
+    [setTabs, setActiveId]
+  );
+
+  const openOrActivateTab = (fname, route) => {
+    const normalized = (fname || "").toLowerCase();
+    const existing = tabs.find(
+      (t) => (t.filename || "").toLowerCase() === normalized
+    );
+    if (existing) {
+      setActiveId(existing.id);
+    } else {
+      const id = nextTabId.current++;
+      const title = getTitleFromFilename(fname) || `Untitled${id}`;
+      // choose initial content for special tabs
+      let initialText = "";
+      if (normalized.includes("kevinwang") || normalized.includes("home")) {
+        initialText = homeContent;
+      } else if (normalized.includes("projects")) {
+        initialText = projectsContent;
+      } else if (normalized.includes("resume")) {
+        initialText = resumeContent;
+      }
+      const tab = { id, title, filename: fname, text: initialText };
+      setTabs((prev) => [...prev, tab]);
+      setActiveId(id);
+    }
+
+    try {
+      window.history.pushState({}, "", route);
+    } catch (e) {
+      window.location.href = route;
+    }
+  };
   const closeTab = (id) => {
     setTabs((prev) => {
       const next = prev.filter((p) => p.id !== id);
@@ -81,8 +177,8 @@ function Notepad() {
         // always keep at least one
         const base = {
           id: 0,
-          title: "Untitled",
-          filename: "Untitled.txt",
+          title: "Kevin Wang",
+          filename: "kevinwang.txt",
           text: "",
         };
         setActiveId(0);
@@ -100,17 +196,73 @@ function Notepad() {
 
   const selectTab = (id) => setActiveId(id);
 
-  const updateActiveText = (newText) => {
-    setTabs((prev) =>
-      prev.map((t) => (t.id === activeId ? { ...t, text: newText } : t))
-    );
-    setText(newText);
+  const getRouteFromFilename = (filename) => {
+    if (!filename) return "/";
+    const lower = filename.toLowerCase();
+    if (lower === "projects.txt" || lower === "projects") return "/projects";
+    if (lower === "resume.txt" || lower === "resume") return "/resume";
+    if (lower === "kevinwang.txt" || lower === "kevinwang") return "/";
+    // fallback: map filename to a file route
+    return `/file/${encodeURIComponent(filename.replace(/\.[^/.]+$/, ""))}`;
   };
 
-  const handleNew = () => {
-    createTab("", "Untitled.txt");
-    textareaRef.current?.focus();
-  };
+  // keep URL in sync with the active tab
+  useEffect(() => {
+    const active = tabs.find((t) => t.id === activeId) || tabs[0];
+    if (!active) return;
+    const route = getRouteFromFilename(active.filename || active.title);
+    try {
+      if (window && window.history && window.location.pathname !== route) {
+        window.history.pushState({}, "", route);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [activeId, tabs]);
+
+  // derive which top-level menu should be highlighted based on active tab
+  const activeTab = tabs.find((t) => t.id === activeId) || tabs[0];
+  const activeFilename = (
+    activeTab?.filename ||
+    activeTab?.title ||
+    ""
+  ).toLowerCase();
+  const isHomeActive =
+    activeFilename.includes("kevinwang") || activeFilename.includes("home");
+  const isProjectsActive = activeFilename.includes("projects");
+  const isResumeActive = activeFilename.includes("resume");
+
+  // global keyboard shortcuts — use refs to access latest tabs/active state
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.ctrlKey && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        const active =
+          (tabsRef.current || []).find((t) => t.id === activeIdRef.current) ||
+          (tabsRef.current || [])[0];
+        const blob = new Blob([active?.text ?? ""], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = active?.filename || "kevinwang.txt";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } else if (e.ctrlKey && (e.key === "o" || e.key === "O")) {
+        e.preventDefault();
+        fileInputRef.current?.click();
+      } else if (e.ctrlKey && (e.key === "n" || e.key === "N")) {
+        e.preventDefault();
+        createTab("", "kevinwang.txt");
+        textareaRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [createTab]);
+
+  // editing disabled: tabs hold text content; no onChange handler required
 
   const handleOpen = (file) => {
     const reader = new FileReader();
@@ -124,19 +276,6 @@ function Notepad() {
     const file = e.target.files?.[0];
     if (file) handleOpen(file);
     e.target.value = "";
-  };
-
-  const handleSave = () => {
-    const active = tabs.find((t) => t.id === activeId) || tabs[0];
-    const blob = new Blob([active?.text ?? ""], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = active?.filename || "Untitled.txt";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -164,26 +303,31 @@ function Notepad() {
             </button>
           </div>
         ))}
-        <button className="tab-add" onClick={handleNew} title="New tab">
-          ＋
-        </button>
       </div>
       <div className="notepad-menu">
         <div className="menu-group">
-          <button className="menu-label">File</button>
-          <div className="menu-dropdown">
-            <button onClick={handleNew}>New (Ctrl+N)</button>
-            <button onClick={() => fileInputRef.current?.click()}>
-              Open... (Ctrl+O)
-            </button>
-            <button onClick={handleSave}>Save (Ctrl+S)</button>
-          </div>
+          <button
+            className={`menu-label ${isHomeActive ? "menu-active" : ""}`}
+            onClick={() => openOrActivateTab("kevinwang.txt", "/")}
+          >
+            Home
+          </button>
         </div>
         <div className="menu-group">
-          <button className="menu-label">Edit</button>
+          <button
+            className={`menu-label ${isProjectsActive ? "menu-active" : ""}`}
+            onClick={() => openOrActivateTab("Projects.txt", "/projects")}
+          >
+            Projects
+          </button>
         </div>
         <div className="menu-group">
-          <button className="menu-label">View</button>
+          <button
+            className={`menu-label ${isResumeActive ? "menu-active" : ""}`}
+            onClick={() => openOrActivateTab("Resume.txt", "/resume")}
+          >
+            Resume
+          </button>
         </div>
         <button
           className="theme-toggle"
@@ -223,14 +367,11 @@ function Notepad() {
         </button>
       </div>
 
-      <textarea
-        ref={textareaRef}
-        className="notepad-text"
-        value={tabs.find((t) => t.id === activeId)?.text ?? ""}
-        onChange={(e) => updateActiveText(e.target.value)}
-        spellCheck={false}
-        placeholder=""
-      />
+      <div className="notepad-text notepad-content">
+        <TypingNotepad
+          content={tabs.find((t) => t.id === activeId)?.text || ""}
+        />
+      </div>
 
       <div className="notepad-status">
         {filename} — {status}
