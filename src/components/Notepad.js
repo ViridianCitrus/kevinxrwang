@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import "./Notepad.css";
-import TypingNotepad from "./TypingNotepad";
+import TypingNotepad, { countCharacters } from "./TypingNotepad";
 import homeContent from "../pages/home";
 import projectsContent from "../pages/projects";
 import resumeContent from "../pages/resume";
@@ -20,10 +20,9 @@ const getTitleFromFilename = (fname) => {
 };
 
 function Notepad() {
-  const [filename, setFilename] = useState("kevinwang.txt");
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
-  const [status, setStatus] = useState("Ln 1, Col 1");
+  const [maximized, setMaximized] = useState(false);
   const [theme, setTheme] = useState(() =>
     typeof window !== "undefined"
       ? localStorage.getItem("notepad-theme") || "light"
@@ -64,51 +63,6 @@ function Notepad() {
   useEffect(() => {
     tabsRef.current = tabs;
   }, [tabs]);
-
-  // update status (Ln/Col/words) based on textarea events and selection
-  useEffect(() => {
-    const updateStatus = () => {
-      const el = textareaRef.current;
-      if (!el) return;
-      const value = el.value || "";
-      const start = el.selectionStart ?? 0;
-      const lines = value.slice(0, start).split("\n");
-      const ln = lines.length;
-      const col = lines[lines.length - 1].length + 1;
-      const words = value.trim() ? value.trim().split(/\s+/).length : 0;
-      setStatus(`Ln ${ln}, Col ${col} — ${words} words`);
-    };
-
-    const el = textareaRef.current;
-    updateStatus();
-    if (el) {
-      el.addEventListener("input", updateStatus);
-      el.addEventListener("click", updateStatus);
-      el.addEventListener("keyup", updateStatus);
-      el.addEventListener("mouseup", updateStatus);
-    }
-    return () => {
-      if (el) {
-        el.removeEventListener("input", updateStatus);
-        el.removeEventListener("click", updateStatus);
-        el.removeEventListener("keyup", updateStatus);
-        el.removeEventListener("mouseup", updateStatus);
-      }
-    };
-  }, [activeId]);
-
-  // keep displayed filename in sync when active tab changes
-  useEffect(() => {
-    const active = tabs.find((t) => t.id === activeId) || tabs[0];
-    if (!active) return;
-    setFilename(active.filename || active.title || "");
-    // trigger status update
-    const el = textareaRef.current;
-    if (el) {
-      const event = new Event("input", { bubbles: true });
-      el.dispatchEvent(event);
-    }
-  }, [activeId, tabs]);
 
   const createTab = useCallback(
     (content = "", fname = "kevinwang.txt") => {
@@ -282,93 +236,148 @@ function Notepad() {
     e.target.value = "";
   };
 
+  const charCount = countCharacters(activeTab?.text);
+
+  const menuItems = [
+    { label: "Home", file: "kevinwang.txt", route: BASE, active: isHomeActive },
+    {
+      label: "Projects",
+      file: "Projects.txt",
+      route: `${BASE}/projects`,
+      active: isProjectsActive,
+    },
+    {
+      label: "Resume",
+      file: "Resume.txt",
+      route: `${BASE}/resume`,
+      active: isResumeActive,
+    },
+  ];
+
   return (
-    <div className={`notepad-root ${theme === "dark" ? "dark" : ""}`}>
-      <div className="notepad-tabs">
-        {tabs.map((t) => (
-          <div
-            key={t.id}
-            className={`notepad-tab ${t.id === activeId ? "tab-active" : ""}`}
-            onClick={() => selectTab(t.id)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === "Enter" && selectTab(t.id)}
-          >
-            <span className="tab-title">{t.title}</span>
-            <button
-              className="tab-close"
-              onClick={(ev) => {
-                ev.stopPropagation();
-                closeTab(t.id);
-              }}
-              aria-label="Close tab"
+    <div
+      className={`notepad-root ${theme === "dark" ? "dark" : ""} ${
+        maximized ? "maximized" : ""
+      }`}
+    >
+      <div className="notepad-titlebar">
+        <svg
+          className="app-icon"
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          aria-hidden
+        >
+          <rect x="2" y="1.5" width="12" height="13" rx="2" fill="#fff" />
+          <rect x="2" y="1.5" width="12" height="13" rx="2" fill="none" stroke="#7a7a7a" />
+          <path d="M2.5 4.5h11V3.5a1.5 1.5 0 00-1.5-1.5H4a1.5 1.5 0 00-1.5 1.5z" fill="#2f8fdf" />
+          <path d="M4.5 7.5h7M4.5 9.75h7M4.5 12h4.5" stroke="#9a9a9a" strokeLinecap="round" />
+        </svg>
+
+        <div className="notepad-tabs" role="tablist">
+          {tabs.map((t) => (
+            <div
+              key={t.id}
+              className={`notepad-tab ${t.id === activeId ? "tab-active" : ""}`}
+              onClick={() => selectTab(t.id)}
+              role="tab"
+              aria-selected={t.id === activeId}
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && selectTab(t.id)}
+              title={t.filename || t.title}
             >
-              ×
-            </button>
-          </div>
-        ))}
+              <span className="tab-title">{t.filename || t.title}</span>
+              <button
+                className="tab-close"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  closeTab(t.id);
+                }}
+                aria-label={`Close ${t.filename || t.title}`}
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
+                  <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1" />
+                </svg>
+              </button>
+            </div>
+          ))}
+          <button
+            className="tab-add"
+            onClick={() => createTab("", "Untitled")}
+            aria-label="New tab"
+            title="New tab (Ctrl+N)"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden>
+              <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="window-controls">
+          <span className="window-control" aria-hidden>
+            <svg width="10" height="10" viewBox="0 0 10 10">
+              <path d="M0 5h10" stroke="currentColor" strokeWidth="1" />
+            </svg>
+          </span>
+          <button
+            className="window-control"
+            onClick={() => setMaximized((m) => !m)}
+            aria-label={maximized ? "Restore" : "Maximize"}
+            title={maximized ? "Restore" : "Maximize"}
+          >
+            {maximized ? (
+              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
+                <rect x="0.5" y="2.5" width="7" height="7" rx="1" fill="none" stroke="currentColor" />
+                <path d="M2.5 2.5V1.5a1 1 0 011-1h5a1 1 0 011 1v5a1 1 0 01-1 1h-1" fill="none" stroke="currentColor" />
+              </svg>
+            ) : (
+              <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
+                <rect x="0.5" y="0.5" width="9" height="9" rx="1" fill="none" stroke="currentColor" />
+              </svg>
+            )}
+          </button>
+          <span className="window-control window-close" aria-hidden>
+            <svg width="10" height="10" viewBox="0 0 10 10">
+              <path d="M0.5 0.5l9 9M9.5 0.5l-9 9" stroke="currentColor" strokeWidth="1" />
+            </svg>
+          </span>
+        </div>
       </div>
+
       <div className="notepad-menu">
-        <div className="menu-group">
+        {menuItems.map((item) => (
           <button
-            className={`menu-label ${isHomeActive ? "menu-active" : ""}`}
-            onClick={() => openOrActivateTab("kevinwang.txt", "/kevinxrwang")}
+            key={item.label}
+            className={`menu-label ${item.active ? "menu-active" : ""}`}
+            onClick={() => openOrActivateTab(item.file, item.route)}
           >
-            Home
+            {item.label}
           </button>
-        </div>
-        <div className="menu-group">
-          <button
-            className={`menu-label ${isProjectsActive ? "menu-active" : ""}`}
-            onClick={() =>
-              openOrActivateTab("Projects.txt", "/kevinxrwang/projects")
-            }
-          >
-            Projects
-          </button>
-        </div>
-        <div className="menu-group">
-          <button
-            className={`menu-label ${isResumeActive ? "menu-active" : ""}`}
-            onClick={() =>
-              openOrActivateTab("Resume.txt", "/kevinxrwang/resume")
-            }
-          >
-            Resume
-          </button>
-        </div>
+        ))}
         <button
           className="theme-toggle"
           onClick={toggleTheme}
           aria-pressed={theme === "dark"}
+          aria-label={theme === "dark" ? "Switch to light" : "Switch to dark"}
           title={theme === "dark" ? "Switch to light" : "Switch to dark"}
         >
           {theme === "dark" ? (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden
-            >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
                 d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"
-                fill="currentColor"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
               />
             </svg>
           ) : (
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden
-            >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="4.25" stroke="currentColor" strokeWidth="1.5" />
               <path
-                d="M6.76 4.84l-1.8-1.79L3.17 4.84l1.79 1.79 1.8-1.79zM1 13h3v-2H1v2zm10-9h2V1h-2v3zm7.04 1.05l1.79-1.79-1.79-1.79-1.79 1.79 1.79 1.79zM17 13h3v-2h-3v2zM12 7a5 5 0 100 10 5 5 0 000-10zm4.24 11.16l1.79 1.79 1.79-1.79-1.79-1.79-1.79 1.79zM12 23h2v-3h-2v3zM4.93 19.07l1.79 1.79 1.79-1.79-1.79-1.79-1.79 1.79z"
-                fill="currentColor"
+                d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.28 5.28l1.41 1.41M17.31 17.31l1.41 1.41M5.28 18.72l1.41-1.41M17.31 6.69l1.41-1.41"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
               />
             </svg>
           )}
@@ -376,13 +385,18 @@ function Notepad() {
       </div>
 
       <div className="notepad-text notepad-content">
-        <TypingNotepad
-          content={tabs.find((t) => t.id === activeId)?.text || ""}
-        />
+        <TypingNotepad content={activeTab?.text || ""} />
       </div>
 
       <div className="notepad-status">
-        {filename} — {status}
+        <span className="status-item">Ln 1, Col 1</span>
+        <span className="status-item">
+          {charCount.toLocaleString()} characters
+        </span>
+        <span className="status-spacer" />
+        <span className="status-item status-optional">100%</span>
+        <span className="status-item status-optional">Windows (CRLF)</span>
+        <span className="status-item status-optional">UTF-8</span>
       </div>
 
       <input

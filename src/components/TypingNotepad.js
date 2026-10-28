@@ -24,6 +24,10 @@ function flattenTextNodes(children, path = []) {
   return result;
 }
 
+export function countCharacters(content) {
+  return flattenTextNodes(content).reduce((sum, n) => sum + n.text.length, 0);
+}
+
 // Given original JSX, reveal text content up to charIndex globally
 function revealTextInTree(children, flattenedTextNodes, charIndex, path = []) {
   let charsConsumed = 0;
