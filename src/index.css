@@ -11,3 +11,34 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+#root {
+  display: flow-root;
+}
+
+/* Desktop wallpaper behind the Notepad window */
+body {
+  background: #c9d8ec radial-gradient(
+      ellipse at 70% 110%,
+      #3f7fd6 0%,
+      #8db3e8 35%,
+      #dfe8f5 75%
+    )
+    fixed;
+}
+
+:root[data-theme="dark"] body {
+  background: #0d1526 radial-gradient(
+      ellipse at 70% 110%,
+      #1d4d9a 0%,
+      #14284b 40%,
+      #0b111d 80%
+    )
+    fixed;
+}
