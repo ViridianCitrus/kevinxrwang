@@ -31,6 +31,10 @@ export function countCharacters(content) {
 // Given original JSX, reveal text content up to charIndex globally
 function revealTextInTree(children, flattenedTextNodes, charIndex, path = []) {
   let charsConsumed = 0;
+  const totalLength = flattenedTextNodes.reduce(
+    (sum, node) => sum + node.text.length,
+    0
+  );
 
   // Helper to reveal text in strings
   function revealText(text) {
@@ -57,6 +61,12 @@ function revealTextInTree(children, flattenedTextNodes, charIndex, path = []) {
       // This is a text node
       return revealText(node.toString());
     } else if (React.isValidElement(node)) {
+      // Hide elements typing hasn't reached so bullets, rules and line breaks
+      // don't appear ahead of their text
+      if (charsConsumed >= charIndex && charIndex < totalLength) {
+        return null;
+      }
+
       // Recurse children
       const children = node.props.children;
       let newChildren = null;
