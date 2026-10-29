@@ -150,14 +150,14 @@ function Notepad() {
 
   const selectTab = (id) => setActiveId(id);
 
-  const BASE = "/kevinxrwang";
+  const BASE = "";
   const getRouteFromFilename = (filename) => {
-    if (!filename) return BASE;
+    if (!filename) return `${BASE}/`;
     const lower = filename.toLowerCase();
     if (lower === "projects.txt" || lower === "projects")
       return `${BASE}/projects`;
     if (lower === "resume.txt" || lower === "resume") return `${BASE}/resume`;
-    if (lower === "kevinwang.txt" || lower === "kevinwang") return BASE;
+    if (lower === "kevinwang.txt" || lower === "kevinwang") return `${BASE}/`;
     // fallback: map filename to a file route
     return `${BASE}/file/${encodeURIComponent(
       filename.replace(/\.[^/.]+$/, "")
@@ -239,7 +239,7 @@ function Notepad() {
   const charCount = countCharacters(activeTab?.text);
 
   const menuItems = [
-    { label: "Home", file: "kevinwang.txt", route: BASE, active: isHomeActive },
+    { label: "Home", file: "kevinwang.txt", route: `${BASE}/`, active: isHomeActive },
     {
       label: "Projects",
       file: "Projects.txt",
